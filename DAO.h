@@ -9,7 +9,7 @@
 
 #define SOFTAC_DATABASE_HOST "localhost"
 #define SOFTAC_DATABASE_USER "root"
-#define SOFTAC_DATABASE_PASSWD "himgod"
+#define SOFTAC_DATABASE_PASSWD "******"
 #define SOFTAC_DATABASE_NAME "softacDB"
 #define SOFTAC_SYS_HEALTH_SCORE_TABLE "sys_health_score"
 #define SOFTAC_AP_INDEX_INFO_TABLE "ap_index_info"
