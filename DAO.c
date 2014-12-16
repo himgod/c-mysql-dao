@@ -295,14 +295,42 @@ int call_back_get_ap_index_info(void* arg,MYSQL_RES* resultSet,int num_fields,in
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            result->apInfo[result->cur_row].signal_intensity = atoi(row[1]);
+            if(row[1])
+            {
+                result->apInfo[result->cur_row].signal_intensity = atoi(row[1]);
+            }
+            else
+            {
+                result->apInfo[result->cur_row].signal_intensity = 0;
+            }
             printf("Field[1]:%d\t",result->apInfo[result->cur_row].signal_intensity);
-            result->apInfo[result->cur_row].down_up_BW = atoi(row[2]);
+            if(row[2])
+            {
+                result->apInfo[result->cur_row].down_up_BW = atoi(row[2]);
+            }
+            else
+            {
+                result->apInfo[result->cur_row].down_up_BW = 0;
+            }
             printf("Field[2]:%d\t",result->apInfo[result->cur_row].down_up_BW);
-            result->apInfo[result->cur_row].time_delay = atoi(row[3]);
+            if(row[3])
+            {
+                result->apInfo[result->cur_row].time_delay = atoi(row[3]);
+            }
+            else
+            {
+                result->apInfo[result->cur_row].time_delay = 0;
+            }
             printf("Field[3]:%d\t",result->apInfo[result->cur_row].time_delay);
             printf("Field[4]:%s\n",row[4]);
-            strcpy(result->apInfo[result->cur_row].collect_timestamp,row[4]);
+            if(row[4])
+            {
+                strcpy(result->apInfo[result->cur_row].collect_timestamp,row[4]);
+            }
+            else
+            {
+                strcpy(result->apInfo[result->cur_row].collect_timestamp,"");
+            }
             result->cur_row++;
         }
         return SUCCESS;
@@ -364,16 +392,87 @@ int call_back_get_afi_info(void* arg,MYSQL_RES* resultSet,int num_fields,int num
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            strcpy(result->afiInfo[result->cur_row].mac_address,row[1]);
+            if(row[1])
+            {
+                strcpy(result->afiInfo[result->cur_row].mac_address,row[1]);
+            }
+            else
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_version,"");
+            }
             strcpy(result->afiInfo[result->cur_row].afi_name,row[2]);
-            strcpy(result->afiInfo[result->cur_row].afi_type,row[3]);
-            strcpy(result->afiInfo[result->cur_row].afi_version,row[4]);
-            strcpy(result->afiInfo[result->cur_row].afi_ip_address,row[5]);
-            result->afiInfo[result->cur_row].running_time = atof(row[6]);
-            result->afiInfo[result->cur_row].uplink_packet_num = atol(row[7]);
-            result->afiInfo[result->cur_row].downlink_packet_num = atol(row[8]);
-            result->afiInfo[result->cur_row].uplink_byte_num = atol(row[9]);
-            result->afiInfo[result->cur_row].downlink_byte_num = atol(row[10]);
+            if(row[3])
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_type,row[3]);
+            }
+            else
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_version,"");
+            }
+            if(row[4])
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_version,row[4]);
+            }
+            else
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_version,"");
+            }
+            if(row[5])
+            {
+                strcpy(result->afiInfo[result->cur_row].afi_ip_address,row[5]);
+            }
+            else
+            {    
+                strcpy(result->afiInfo[result->cur_row].afi_ip_address,"");
+            }
+            if(row[6])
+            {
+                result->afiInfo[result->cur_row].running_time = atof(row[6]);
+            }
+            else
+            {
+                result->afiInfo[result->cur_row].running_time = 0.0;
+            }
+            if(row[7])
+            {
+                result->afiInfo[result->cur_row].uplink_packet_num = atol(row[7]);
+            }
+            else
+            {
+                result->afiInfo[result->cur_row].uplink_packet_num = 0L;
+            }
+            if(row[8])
+            {
+                result->afiInfo[result->cur_row].downlink_packet_num = atol(row[8]);
+            }
+            else
+            {
+                result->afiInfo[result->cur_row].downlink_packet_num = 0L;
+            }
+            if(row[9])
+            {
+                result->afiInfo[result->cur_row].uplink_byte_num = atol(row[9]);
+            }
+            else
+            {
+                result->afiInfo[result->cur_row].uplink_byte_num = 0L;
+            }
+            if(row[10])
+            {
+                result->afiInfo[result->cur_row].downlink_byte_num = atol(row[10]);
+            }
+            else
+            {
+                result->afiInfo[result->cur_row].downlink_byte_num = 0L;
+            }
+            if(row[11])
+            {
+                strcpy(result->afiInfo[result->cur_row].collect_timestamp,row[11]);
+            }
+            else
+            {
+                strcpy(result->afiInfo[result->cur_row].collect_timestamp,"");
+            }
             printf("Field[1]:%s\t",result->afiInfo[result->cur_row].mac_address);
             printf("Field[2]:%s\t",result->afiInfo[result->cur_row].afi_name);
             printf("Field[3]:%s\t",result->afiInfo[result->cur_row].afi_type);
@@ -384,6 +483,7 @@ int call_back_get_afi_info(void* arg,MYSQL_RES* resultSet,int num_fields,int num
             printf("Field[8]:%ld\t",result->afiInfo[result->cur_row].downlink_packet_num);
             printf("Field[9]:%ld\t",result->afiInfo[result->cur_row].uplink_byte_num);
             printf("Field[10]:%ld\n",result->afiInfo[result->cur_row].downlink_byte_num);
+            printf("Field[11]:%s\n",result->afiInfo[result->cur_row].collect_timestamp);
             result->cur_row++;
         }
         return SUCCESS;
@@ -444,15 +544,78 @@ int call_back_get_sys_score_info(void* arg,MYSQL_RES* resultSet,int num_fields,i
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            result->sysInfo[result->cur_row].health_score = atoi(row[1]);
-            result->sysInfo[result->cur_row].signal_interference = atoi(row[2]);
-            result->sysInfo[result->cur_row].downlink_byte_num = atol(row[3]);
-            result->sysInfo[result->cur_row].uplink_byte_num = atol(row[4]);
-            result->sysInfo[result->cur_row].cover_area = atoi(row[5]);
-            result->sysInfo[result->cur_row].signal_intensity = atoi(row[6]);
-            result->sysInfo[result->cur_row].user_access_rate = atoi(row[7]);
-            result->sysInfo[result->cur_row].online_user_num = atoi(row[8]);
-            strcpy(result->sysInfo[result->cur_row].collect_timestamp,row[9]);
+            if(row[1])
+            {
+                result->sysInfo[result->cur_row].health_score = atoi(row[1]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].health_score = 0;
+            }
+            if(row[2])
+            {
+                result->sysInfo[result->cur_row].signal_interference = atoi(row[2]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].signal_interference = 0;
+            }
+            if(row[3])
+            {
+                result->sysInfo[result->cur_row].downlink_byte_num = atol(row[3]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].downlink_byte_num = 0L;
+            }
+            if(row[4])
+            {
+               result->sysInfo[result->cur_row].uplink_byte_num = atol(row[4]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].uplink_byte_num = 0L;
+            }
+            if(row[5])
+            {
+                result->sysInfo[result->cur_row].cover_area = atoi(row[5]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].cover_area = 0;
+            }
+            if(row[6])
+            {
+                result->sysInfo[result->cur_row].signal_intensity = atoi(row[6]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].signal_intensity = 0;
+            }
+            if(row[7])
+            {
+                result->sysInfo[result->cur_row].user_access_rate = atoi(row[7]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].user_access_rate = 0;
+            }
+            if(row[8])
+            {
+                result->sysInfo[result->cur_row].online_user_num = atoi(row[8]);
+            }
+            else
+            {
+                result->sysInfo[result->cur_row].online_user_num = 0;;
+            }
+            if(row[9])
+            {
+                strcpy(result->sysInfo[result->cur_row].collect_timestamp,row[9]);
+            }
+            else
+            {
+                strcpy(result->sysInfo[result->cur_row].collect_timestamp,"");
+            }
             printf("Field[1]:%d\t",result->sysInfo[result->cur_row].health_score);
             printf("Field[2]:%d\t",result->sysInfo[result->cur_row].signal_interference);
             printf("Field[3]:%ld\t",result->sysInfo[result->cur_row].downlink_byte_num);
@@ -523,11 +686,46 @@ int call_back_get_throughout_info(void* arg,MYSQL_RES* resultSet,int num_fields,
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            result->throughoutInfo[result->cur_row].uplink_packet_num = atol(row[1]);
-            result->throughoutInfo[result->cur_row].downlink_packet_num = atol(row[2]);
-            result->throughoutInfo[result->cur_row].uplink_byte_num = atol(row[3]);
-            result->throughoutInfo[result->cur_row].downlink_byte_num = atol(row[4]);
-            strcpy(result->throughoutInfo[result->cur_row].collect_timestamp,row[5]);
+            if(row[1])
+            {
+                result->throughoutInfo[result->cur_row].uplink_packet_num = atol(row[1]);
+            }
+            else
+            {
+                result->throughoutInfo[result->cur_row].uplink_packet_num = 0L;
+            }
+            if(row[2])
+            {
+                result->throughoutInfo[result->cur_row].downlink_packet_num = atol(row[2]);
+            }
+            else
+            {
+                result->throughoutInfo[result->cur_row].downlink_packet_num = 0L;
+            }
+            if(row[3])
+            {
+                result->throughoutInfo[result->cur_row].uplink_byte_num = atol(row[3]);
+            }
+            else
+            {
+                result->throughoutInfo[result->cur_row].uplink_byte_num = 0L;
+            }
+            if(row[4])
+            {
+                result->throughoutInfo[result->cur_row].downlink_byte_num = atol(row[4]);
+            }
+            else
+            {
+                result->throughoutInfo[result->cur_row].downlink_byte_num = 0L;
+            }
+            if(row[5])
+            {
+                strcpy(result->throughoutInfo[result->cur_row].collect_timestamp,row[5]);
+            }
+            else
+            {
+                strcpy(result->throughoutInfo[result->cur_row].collect_timestamp,"");
+            }
             printf("Field[1]:%ld\t",result->throughoutInfo[result->cur_row].uplink_packet_num);
             printf("Field[2]:%ld\t",result->throughoutInfo[result->cur_row].downlink_packet_num);
             printf("Field[3]:%ld\t",result->throughoutInfo[result->cur_row].uplink_byte_num);
@@ -594,16 +792,95 @@ int call_back_get_user_detail_info(void* arg,MYSQL_RES* resultSet,int num_fields
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            strcpy(result->userInfo[result->cur_row].mac_address,row[1]);
-            strcpy(result->userInfo[result->cur_row].mac_alias,row[2]);
-            strcpy(result->userInfo[result->cur_row].hostname,row[3]);
-            strcpy(result->userInfo[result->cur_row].ip_address,row[4]);
-            strcpy(result->userInfo[result->cur_row].access_point,row[5]);
-            result->userInfo[result->cur_row].running_time = atof(row[6]);
-            result->userInfo[result->cur_row].uplink_packet_num = atol(row[7]);
-            result->userInfo[result->cur_row].downlink_packet_num = atol(row[8]);
-            result->userInfo[result->cur_row].uplink_byte_num = atol(row[9]);
-            result->userInfo[result->cur_row].downlink_byte_num = atol(row[10]);
+            if(row[1])
+            {
+                strcpy(result->userInfo[result->cur_row].mac_address,row[1]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].mac_address,"");
+            }
+            if(row[2])
+            {
+                strcpy(result->userInfo[result->cur_row].mac_alias,row[2]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].mac_alias,"");
+            }
+            if(row[3])
+            {
+                strcpy(result->userInfo[result->cur_row].hostname,row[3]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].hostname,"");
+            }
+            if(row[4])
+            {
+                strcpy(result->userInfo[result->cur_row].ip_address,row[4]);
+            } 
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].ip_address,"");
+            }
+            if(row[5])
+            {
+                strcpy(result->userInfo[result->cur_row].access_point,row[5]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].access_point,"");
+            }
+            if(row[6])
+            {
+                result->userInfo[result->cur_row].running_time = atof(row[6]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].running_time = 0.0;
+            }
+            if(row[7])
+            {
+                result->userInfo[result->cur_row].uplink_packet_num = atol(row[7]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].uplink_packet_num = 0L;
+            }
+            if(row[8])
+            {
+                result->userInfo[result->cur_row].downlink_packet_num = atol(row[8]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].downlink_packet_num = 0L;
+            }
+            if(row[9])
+            {
+                result->userInfo[result->cur_row].uplink_byte_num = atol(row[9]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].uplink_byte_num = 0L;
+            }
+            if(row[10])
+            {
+                result->userInfo[result->cur_row].downlink_byte_num = atol(row[10]);
+            }
+            else
+            { 
+                result->userInfo[result->cur_row].downlink_byte_num = 0L;
+            }
+            if(row[11])
+            {
+                strcpy(result->userInfo[result->cur_row].collect_timestamp,row[11]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].collect_timestamp,"");
+            }
+
             printf("Field[1]:%s\t",result->userInfo[result->cur_row].mac_address);
             printf("Field[2]:%s\t",result->userInfo[result->cur_row].mac_alias);
             printf("Field[3]:%s\t",result->userInfo[result->cur_row].hostname);
@@ -614,6 +891,7 @@ int call_back_get_user_detail_info(void* arg,MYSQL_RES* resultSet,int num_fields
             printf("Field[8]:%ld\t",result->userInfo[result->cur_row].downlink_packet_num);
             printf("Field[9]:%ld\t",result->userInfo[result->cur_row].uplink_byte_num);
             printf("Field[10]:%ld\n",result->userInfo[result->cur_row].downlink_byte_num);
+            printf("Field[11]:%s\n",result->userInfo[result->cur_row].collect_timestamp);
             result->cur_row++;
         }
 
@@ -676,11 +954,46 @@ int call_back_get_user_index_info(void* arg,MYSQL_RES* resultSet,int num_fields,
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            result->userInfo[result->cur_row].signal_intensity = atoi(row[1]);
-            result->userInfo[result->cur_row].consultation_rate = atoi(row[2]);
-            result->userInfo[result->cur_row].access_rate = atoi(row[3]);
-            result->userInfo[result->cur_row].WL_retransmission_rate = atoi(row[4]);
-            strcpy(result->userInfo[result->cur_row].collect_timestamp,row[5]);
+            if(row[1])
+            {
+                result->userInfo[result->cur_row].signal_intensity = atoi(row[1]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].signal_intensity = 0;
+            }
+            if(row[2])
+            {
+                result->userInfo[result->cur_row].consultation_rate = atoi(row[2]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].consultation_rate = 0;
+            }
+            if(row[3])
+            {
+                result->userInfo[result->cur_row].access_rate = atoi(row[3]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].access_rate = 0;
+            }
+            if(row[4])
+            {
+                result->userInfo[result->cur_row].WL_retransmission_rate = atoi(row[4]);
+            }
+            else
+            {
+                result->userInfo[result->cur_row].WL_retransmission_rate = 0;
+            }
+            if(row[5])
+            {
+                strcpy(result->userInfo[result->cur_row].collect_timestamp,row[5]);
+            }
+            else
+            {
+                strcpy(result->userInfo[result->cur_row].collect_timestamp,"");
+            }
             printf("Field[1]:%d\t",result->userInfo[result->cur_row].signal_intensity);
             printf("Field[2]:%d\t",result->userInfo[result->cur_row].consultation_rate);
             printf("Field[3]:%d\t",result->userInfo[result->cur_row].access_rate);
@@ -748,10 +1061,38 @@ int call_back_get_wifi_index_info(void* arg,MYSQL_RES* resultSet,int num_fields,
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            result->wifiInfo[result->cur_row].signal_noise_rate = atoi(row[1]);
-            result->wifiInfo[result->cur_row].channel_utilization = atoi(row[2]);
-            result->wifiInfo[result->cur_row].signal_interference = atoi(row[3]);
-            strcpy(result->wifiInfo[result->cur_row].collect_timestamp,row[4]); 
+            if(row[1])
+            {
+                result->wifiInfo[result->cur_row].signal_noise_rate = atoi(row[1]);
+            }
+            else
+            {
+                result->wifiInfo[result->cur_row].signal_noise_rate = 0;
+            }
+            if(row[2])
+            {
+                result->wifiInfo[result->cur_row].channel_utilization = atoi(row[2]);
+            }
+            else
+            {
+                result->wifiInfo[result->cur_row].channel_utilization = 0;
+            }
+            if(row[3])
+            {
+                result->wifiInfo[result->cur_row].signal_interference = atoi(row[3]);
+            }
+            else
+            {
+                result->wifiInfo[result->cur_row].signal_interference = 0;
+            }
+            if(row[4])
+            {
+                strcpy(result->wifiInfo[result->cur_row].collect_timestamp,row[4]); 
+            }
+            else
+            {
+                strcpy(result->wifiInfo[result->cur_row].collect_timestamp,""); 
+            }
             printf("Field[1]:%d\t",result->wifiInfo[result->cur_row].signal_noise_rate);
             printf("Field[2]:%d\t",result->wifiInfo[result->cur_row].channel_utilization);
             printf("Field[3]:%d\t",result->wifiInfo[result->cur_row].signal_interference);
@@ -818,14 +1159,70 @@ int call_back_get_wireless_index_info(void* arg,MYSQL_RES* resultSet,int num_fie
         {
             //i = atoi(row[1]);
             printf("%d\n",result->cur_row);
-            strcpy(result->wirelessInfo[result->cur_row].essid,row[1]);
-            strcpy(result->wirelessInfo[result->cur_row].AFi_n,row[2]);
-            result->wirelessInfo[result->cur_row].online_user_count = atoi(row[3]);
-            result->wirelessInfo[result->cur_row].uplink_packet_num = atol(row[4]);
-            result->wirelessInfo[result->cur_row].downlink_packet_num = atol(row[5]);
-            result->wirelessInfo[result->cur_row].uplink_byte_num = atol(row[6]);
-            result->wirelessInfo[result->cur_row].downlink_byte_num = atol(row[7]);
-            strcpy(result->wirelessInfo[result->cur_row].collect_timestamp,row[8]);
+            if(row[1])
+            {
+                strcpy(result->wirelessInfo[result->cur_row].essid,row[1]);
+            }
+            else
+            {
+                strcpy(result->wirelessInfo[result->cur_row].essid,"");
+            }
+            if(row[2])
+            {
+                strcpy(result->wirelessInfo[result->cur_row].AFi_n,row[2]);
+            }
+            else
+            {
+                strcpy(result->wirelessInfo[result->cur_row].AFi_n,"");
+            }
+            if(row[3])
+            {
+                result->wirelessInfo[result->cur_row].online_user_count = atoi(row[3]);
+            }
+            else
+            {
+                result->wirelessInfo[result->cur_row].online_user_count = 0;
+            }
+            if(row[4])
+            {
+                result->wirelessInfo[result->cur_row].uplink_packet_num = atol(row[4]);
+            }
+            else
+            {
+                result->wirelessInfo[result->cur_row].uplink_packet_num = 0L;
+            }
+            if(row[5])
+            {
+                result->wirelessInfo[result->cur_row].downlink_packet_num = atol(row[5]);
+            }
+            else
+            {
+                result->wirelessInfo[result->cur_row].downlink_packet_num = 0L;
+            }
+            if(row[6])
+            {
+                result->wirelessInfo[result->cur_row].uplink_byte_num = atol(row[6]);
+            }
+            else
+            {
+                result->wirelessInfo[result->cur_row].uplink_byte_num = 0L;
+            }
+            if(row[7])
+            {
+                result->wirelessInfo[result->cur_row].downlink_byte_num = atol(row[7]);
+            }
+            else
+            {
+                result->wirelessInfo[result->cur_row].downlink_byte_num = 0L;
+            }
+            if(row[8])
+            {
+                strcpy(result->wirelessInfo[result->cur_row].collect_timestamp,row[8]);
+            }
+            else
+            {
+                strcpy(result->wirelessInfo[result->cur_row].collect_timestamp,"");
+            }
             printf("Field[1]:%s\t",result->wirelessInfo[result->cur_row].essid);      
             printf("Field[2]:%s\t",result->wirelessInfo[result->cur_row].AFi_n);
             printf("Field[3]:%d\n",result->wirelessInfo[result->cur_row].online_user_count);
@@ -1114,7 +1511,7 @@ int db_add_ap_index_info(ap_info* ap)
 int db_add_afi_info(afi_info* afi)
 {
     MYSQL mysql;
-    char* prepStmt = "insert into %s values(NULL,'%s','%s','%s','%s','%s',%f,%ld,%ld,%ld,%ld);";
+    char* prepStmt = "insert into %s values(NULL,'%s','%s','%s','%s','%s',%f,%ld,%ld,%ld,%ld,'%s');";
     char* queryStmt = (char*)malloc(2048);
     int ret = 0;
     
@@ -1128,7 +1525,7 @@ int db_add_afi_info(afi_info* afi)
     }
     // mysql_init(mysql);
     db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
-    sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,afi->mac_address,afi->afi_name,afi->afi_type,afi->afi_version,afi->afi_ip_address,afi->running_time,afi->uplink_packet_num,afi->downlink_packet_num,afi->uplink_byte_num,afi->downlink_byte_num);
+    sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,afi->mac_address,afi->afi_name,afi->afi_type,afi->afi_version,afi->afi_ip_address,afi->running_time,afi->uplink_packet_num,afi->downlink_packet_num,afi->uplink_byte_num,afi->downlink_byte_num,afi->collect_timestamp);
     ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
     
     db_put_database_connection(&mysql);
@@ -1220,7 +1617,7 @@ int db_add_throughout_index_info(throughout_info* throughout)
 int db_add_user_detail_info(user_detailinfo* userinfo)
 {
     MYSQL mysql;
-    char* prepStmt = "insert into %s values(NULL,'%s','%s','%s','%s','%s',%f,%ld,%ld,%ld,%ld);";
+    char* prepStmt = "insert into %s values(NULL,'%s','%s','%s','%s','%s',%f,%ld,%ld,%ld,%ld,'%s');";
     
     char* queryStmt = (char*)malloc(2048);
     int ret = 0;
@@ -1236,7 +1633,7 @@ int db_add_user_detail_info(user_detailinfo* userinfo)
     
     // mysql_init(mysql);
     db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
-    sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,userinfo->mac_address,userinfo->mac_alias,userinfo->hostname,userinfo->ip_address,userinfo->access_point,userinfo->running_time,userinfo->uplink_packet_num,userinfo->downlink_packet_num,userinfo->uplink_byte_num,userinfo->downlink_byte_num);
+    sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,userinfo->mac_address,userinfo->mac_alias,userinfo->hostname,userinfo->ip_address,userinfo->access_point,userinfo->running_time,userinfo->uplink_packet_num,userinfo->downlink_packet_num,userinfo->uplink_byte_num,userinfo->downlink_byte_num,userinfo->collect_timestamp);
     ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
     
     db_put_database_connection(&mysql);
@@ -1652,6 +2049,108 @@ int db_delete_wireless_index_info_after_time(char* timestamp)
     }
     return FAILURE;
 }
+
+/*
+ *删除表格afi_detailinfo中的时间点timestamp之前的记录
+ *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
+ *return:0 means success,-1 means failure
+ */
+int db_delete_afi_info_before_time(char* timestamp)
+{
+    MYSQL mysql;
+    char* prepStmt = "delete from %s where collect_timestamp < '%s';";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    
+    // mysql_init(mysql);
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,timestamp);
+    ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
+    
+    db_put_database_connection(&mysql);
+    if( ret > 0 )
+    {
+        return SUCCESS;
+    }
+    return FAILURE;
+}
+
+/*
+ *删除表格afi_detailinfo中的时间点timestamp之后的记录
+ *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
+ *return:0 means success,-1 means failure
+ */
+int db_delete_afi_info_after_time(char* timestamp)
+{
+    MYSQL mysql;
+    char* prepStmt = "delete from %s where collect_timestamp > '%s';";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    
+    // mysql_init(mysql);
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,timestamp);
+    ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
+    
+    db_put_database_connection(&mysql);
+    if( ret > 0 )
+    {
+        return SUCCESS;
+    }
+    return FAILURE;
+}
+
+/*
+ *删除表格user_detailinfo中的时间点timestamp之前的记录
+ *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
+ *return:0 means success,-1 means failure
+ */
+int db_delete_user_detail_info_before_time(char* timestamp)
+{
+    MYSQL mysql;
+    char* prepStmt = "delete from %s where collect_timestamp < '%s';";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    
+    // mysql_init(mysql);
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,timestamp);
+    ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
+    
+    db_put_database_connection(&mysql);
+    if( ret > 0 )
+    {
+        return SUCCESS;
+    }
+    return FAILURE;
+}
+
+/*
+ *删除表格user_detailinfo中的时间点timestamp之后的记录
+ *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
+ *return:0 means success,-1 means failure
+ */
+int db_delete_user_detail_info_after_time(char* timestamp)
+{
+    MYSQL mysql;
+    char* prepStmt = "delete from %s where collect_timestamp > '%s';";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    
+    // mysql_init(mysql);
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,timestamp);
+    ret = db_do_query_2(&mysql,queryStmt,NULL,NULL);
+    
+    db_put_database_connection(&mysql);
+    if( ret > 0 )
+    {
+        return SUCCESS;
+    }
+    return FAILURE;
+}
+
+
 #ifdef TEST_MAIN
 #if TEST_MAIN 
 int main()
@@ -1698,11 +2197,12 @@ int main()
     afi.downlink_packet_num = 22345;
     afi.uplink_byte_num = 0;
     afi.downlink_byte_num = 0;
-    
+    strcpy(afi.collect_timestamp,format_time);
     query_afi_info queryAfiInfo;
     memset(&queryAfiInfo,0,sizeof(queryAfiInfo));
 
     db_add_afi_info(&afi); 
+    db_delete_afi_info_before_time(format_time);
     db_get_afi_info(&queryAfiInfo);
     printf("rows:%d\n",queryAfiInfo.num_rows);
     /********************************************/
@@ -1721,7 +2221,6 @@ int main()
     memset(&querySysInfo,0,sizeof(querySysInfo));
     db_add_sys_score_index_info(&sys); 
     db_delete_sys_score_info_before_time(format_time);
-   // db_get_ap_index_info(&queryApInfo);
     db_get_sys_score_info(&querySysInfo);
     printf("rows:%d\n",querySysInfo.num_rows);
     /*******************************************/
@@ -1753,11 +2252,13 @@ int main()
     user.downlink_packet_num = 127;
     user.uplink_byte_num = 1234;
     user.downlink_byte_num = 2345;
+    strcpy(user.collect_timestamp,format_time);
 
     query_user_detailinfo queryUserDetailInfo;
     memset(&queryUserDetailInfo,0,sizeof(queryUserDetailInfo));
 
     db_add_user_detail_info(&user);
+    db_delete_user_detail_info_before_time(format_time);
     db_get_user_detail_info(&queryUserDetailInfo);
     printf("rows:%d\n",queryUserDetailInfo.num_rows);
     /*******************************************/

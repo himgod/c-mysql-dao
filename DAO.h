@@ -64,6 +64,7 @@ typedef struct afi_detailinfo{
     long downlink_packet_num;
     long uplink_byte_num;
     long downlink_byte_num;
+    char collect_timestamp[TIMESTAMP_LENGTH];
 }afi_info;
 
 typedef struct query_afi_info{
@@ -138,6 +139,7 @@ typedef struct user_detailinfo{
     long uplink_packet_num;
     long downlink_byte_num;
     long uplink_byte_num;
+    char collect_timestamp[TIMESTAMP_LENGTH];
 }user_detailinfo;
 
 typedef struct query_user_detailinfo{
@@ -209,16 +211,32 @@ int get_db_tm_from_format_time(char* format_time,struct tm* timeinfo);
 int db_do_query_2(MYSQL* mysql,const char* query,int(*call_back)(void*,MYSQL_RES*,int,int),void* result);
 /*
  *查询接口
+ *
  */
+//查询全部
 int db_get_ap_index_info(query_ap_info* query_info);
 int db_get_afi_info(query_afi_info* query_info);
 int db_get_sys_score_info(query_sys_info* query_info);
 int db_get_throughout_index_info(query_throughout_info* query_info);
 int db_get_user_detail_info(query_user_detailinfo* query_info);
 int db_get_user_index_info(query_user_info* query_info);
-int db_get_wifi_i`ndex_info(query_wifi_info* query_info);
+int db_get_wifi_index_info(query_wifi_info* query_info);
 int db_get_wireless_index_info(query_wireless_info* query_info);
-
+//根据时间段查询
+int db_get_ap_index_info_after_timestamp(char* timestamp,query_ap_info* query_info);
+int db_get_afi_info_after_timestamp(char* timestamp,query_afi_info* query_info);
+int db_get_sys_score_info_after_timestamp(char* timestamp,query_sys_info* query_info);
+int db_get_throughout_index_info_after_timestamp(char* timestamp,query_throughout_info* query_info);
+int db_get_user_detail_info_after_timestamp(char* timestamp,query_user_detailinfo* query_info);
+int db_get_user_index_info_after_timestamp(char* timestamp,query_user_info* query_info);
+int db_get_wifi_index_info_after_timestamp(char* timestamp,query_wifi_info* query_info);
+int db_get_wireless_index_info_after_timestamp(char* timestamp,query_wireless_info* query_info);
+//根据不同字段
+int db_get_afi_info_by_mac(char* mac,query_afi_info* query_info);
+int db_get_afi_info_by_AFi_name(char* AFi_name,query_afi_info* query_info);
+int db_get_user_detail_info_by_mac(char* mac,query_user_detailinfo* query_info);
+int db_get_user_detail_info_by_mac_alias(char* mac_alias,query_user_detailinfo* query_info);
+int db_get_user_detail_info_by_access_point(char* access_point);
 /*
  *添加数据库接口
  */
@@ -250,9 +268,9 @@ int db_delete_wifi_index_info_before_time(char* timestamp);
 int db_delete_wifi_index_info_after_time(char* timestamp);
 int db_delete_wireless_index_info_before_time(char* timestamp);
 int db_delete_wireless_index_info_after_time(char* timestamp);
-
 /*
  *数据库更新操作接口
  */
-
+int db_update_afi_info();
+int db_update_user_detail_info();
 #endif
