@@ -43,7 +43,7 @@ int get_db_format_time_str_from_tm(struct tm* timeinfo,char*format_time_str)
  *output parameter:struct tm* timeinfo
  *return: 0 means success ,-1 means failure
  */
-int get_db_tm_from_format_time(char* format_time_str,struct tm* timeinfo)
+int get_db_tm_from_format_time(const char* format_time_str,struct tm* timeinfo)
 {
     if( timeinfo == NULL || format_time_str == NULL )
     {
@@ -56,6 +56,110 @@ int get_db_tm_from_format_time(char* format_time_str,struct tm* timeinfo)
         return SUCCESS;
     }
     return FAILURE;
+}
+/*
+ *获取24小时之前的时刻
+ *param:timestamp,输入调用的时间
+ *param:format_time,输出的格式化时间。两者相差整整24个小时
+ *return:24之前的格式化时间字符串
+ */
+char* get_time_within_24h(const char* timestamp,char* format_time)
+{
+   // char* format_time = (char*)malloc(20);
+    //just for special mday.eg.1
+    struct tm tmpTime;
+    //格式化的时间字符串转换为对应的结构体
+    get_db_tm_from_format_time(timestamp,&tmpTime);
+
+    //如果日期为1的话
+    if(tmpTime.tm_mday == 1)
+    {
+        //如果同时月份为1月份,即0
+        if( tmpTime.tm_mon == 0 )
+        {
+            //tmpTime.tm_mday = tmpTime.tm_mday - 1;
+            tmpTime.tm_year = tmpTime.tm_year -1;
+            tmpTime.tm_mon = 11;
+            tmpTime.tm_mday = 31;
+        }
+        else
+        {
+            tmpTime.tm_mon = tmpTime.tm_mon - 1;
+            if((tmpTime.tm_year%4) == 0 && tmpTime.tm_mon == 1)
+            {
+                tmpTime.tm_mday = 29;//闰年2月
+            }
+            else
+            {
+                tmpTime.tm_mday = month[tmpTime.tm_mon];
+            }
+        }
+    }
+    else
+    {
+            tmpTime.tm_mday = tmpTime.tm_mday - 1;
+    }
+    get_db_format_time_str_from_tm(&tmpTime,format_time);
+    return format_time;
+}
+
+/*
+ *获取30天之前的时刻
+ *param:timestamp,输入调用的时间
+ *param:format_time,输出的格式化时间。两者相差整整30天
+ *return:30天之前的格式化时间字符串
+ */
+char* get_time_within_30d(const char* timestamp,char* format_time)
+{
+   // char* format_time = (char*)malloc(20);
+    //just for special mday.eg.1
+    struct tm tmpTime;
+    //格式化时间字符转换为对应的时间结构体
+    get_db_tm_from_format_time(timestamp,&tmpTime);
+
+    //如果日期不为31,则按不同的月份处理
+    if(tmpTime.tm_mday < 31)
+    {
+            
+        int diff = tmpTime.tm_mday - 30;
+        //月份不是１月份
+        if( tmpTime.tm_mon != 0 )
+        {
+                
+           // printf("年份减1:%d\n",tmpTime.tm_year);
+            tmpTime.tm_mon = tmpTime.tm_mon - 1;
+            if( tmpTime.tm_year%4 == 0 )
+            {
+                month[1] = 29;
+            }
+            int m_day = month[tmpTime.tm_mon] + diff; 
+            //针对3月1或者2号的情况（闰年或者非闰年）
+            if( m_day <= 0 )
+            {
+                tmpTime.tm_mon = tmpTime.tm_mon - 1;
+                tmpTime.tm_mday = month[tmpTime.tm_mon] + m_day;
+            }
+            else
+            {
+                tmpTime.tm_mday = m_day;
+            }
+        }
+        else
+        {
+            //针对每年的1月份日期30以下
+            //printf("年份减1:%d\n",tmpTime.tm_year);
+            tmpTime.tm_year = tmpTime.tm_year - 1;
+            tmpTime.tm_mon = 11;
+            tmpTime.tm_mday = month[11] + diff;
+        }
+    }
+    else
+    {
+        //日期为31
+        tmpTime.tm_mday = tmpTime.tm_mday - 30;
+    }
+    get_db_format_time_str_from_tm(&tmpTime,format_time);
+    return format_time;
 }
 /*
  *just to connect to dabase
@@ -1267,7 +1371,7 @@ int call_back_get_wireless_index_info(void* arg,MYSQL_RES* resultSet,int num_fie
 int db_get_ap_index_info(query_ap_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1287,6 +1391,96 @@ int db_get_ap_index_info(query_ap_info* query_info)
 }
 
 /*
+ * 查询数据库表ap_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_ap_index_info_within_24h(const char* timestamp,query_ap_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_AP_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_AP_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_ap_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表ap_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_ap_index_info_within_30d(const char* timestamp,query_ap_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_AP_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_AP_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_ap_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
  * 查询数据库表afi_detailinfo_db的接口，即用户调用的入口。
  *param:query_info,类型为结构体query_afi_info，输出对应的结果集 
  *return:FAILURE -1,0 means SUCCESS
@@ -1294,7 +1488,7 @@ int db_get_ap_index_info(query_ap_info* query_info)
 int db_get_afi_info(query_afi_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1310,6 +1504,96 @@ int db_get_afi_info(query_afi_info* query_info)
     }
     return FAILURE;
 }
+/*
+ * 查询数据库表afi_detailinfo,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_afi_info_within_24h(const char* timestamp,query_afi_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_afi_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表afi_detailinfo_db,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_afi_info_within_30d(const char* timestamp,query_afi_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_AFI_DETAILINFO_DB_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_afi_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
 
 /*
  *查询数据库表afi_detailinfo_db的接口，即用户调用的入口
@@ -1317,10 +1601,10 @@ int db_get_afi_info(query_afi_info* query_info)
  *query_info，类型为结构体query_sys_info,输出对应的结果集
  *return:FAILURE -1,0 means SUCCESS
  */
-int db_get_afi_info_by_mac(char* mac,query_afi_info* query_info)
+int db_get_afi_info_by_mac(const char* mac,query_afi_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s where MAC_address like '%s';";
+    char* prepStmt = "select * from %s where MAC_address like '%s' order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     char mac_addr[40] = {0};
@@ -1350,10 +1634,10 @@ int db_get_afi_info_by_mac(char* mac,query_afi_info* query_info)
  *query_info，类型为结构体query_sys_info,输出对应的结果集
  *return:FAILURE -1,0 means SUCCESS
  */
-int db_get_afi_info_by_AFi_name(char* AFi_name,query_afi_info* query_info)
+int db_get_afi_info_by_AFi_name(const char* AFi_name,query_afi_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s where AFi_name like '%s';";
+    char* prepStmt = "select * from %s where AFi_name like '%s' order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     //拼接字符串
@@ -1384,7 +1668,7 @@ int db_get_afi_info_by_AFi_name(char* AFi_name,query_afi_info* query_info)
 int db_get_sys_score_info(query_sys_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1400,6 +1684,98 @@ int db_get_sys_score_info(query_sys_info* query_info)
     }
     return FAILURE;
 }
+
+/*
+ * 查询数据库表sys_health_score_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_sys_score_info_within_24h(const char* timestamp,query_sys_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_SYS_HEALTH_SCORE_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_SYS_HEALTH_SCORE_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_sys_score_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表sys_health_score_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_sys_score_info_within_30d(const char* timestamp,query_sys_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_SYS_HEALTH_SCORE_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_SYS_HEALTH_SCORE_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_sys_score_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+
 /*
  * 查询数据库表throughout_index_info的接口，即用户调用的入口。
  *param:query_info,类型为结构体query_throughout_info，输出对应的结果集 
@@ -1408,7 +1784,7 @@ int db_get_sys_score_info(query_sys_info* query_info)
 int db_get_throughout_info(query_throughout_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1424,6 +1800,98 @@ int db_get_throughout_info(query_throughout_info* query_info)
     }
     return FAILURE;
 }
+
+/*
+ * 查询数据库表throughout_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_throughout_info_within_24h(const char* timestamp,query_throughout_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_THROUGHOUT_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_THROUGHOUT_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_throughout_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表throughout_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_throughout_info_within_30d(const char* timestamp,query_throughout_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_THROUGHOUT_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_THROUGHOUT_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_throughout_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+
 /*
  * 查询数据库表user_detailinfo_db的接口，即用户调用的入口。
  *param:query_info,类型为结构体query_user_detailinfo，输出对应的结果集 
@@ -1432,7 +1900,7 @@ int db_get_throughout_info(query_throughout_info* query_info)
 int db_get_user_detail_info(query_user_detailinfo* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1450,15 +1918,106 @@ int db_get_user_detail_info(query_user_detailinfo* query_info)
 }
 
 /*
+ * 查询数据库表user_detailinfo_db,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_user_detail_info_within_24h(const char* timestamp,query_user_detailinfo* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_user_detail_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表user_detailinfo_db,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_user_detail_info_within_30d(const char* timestamp,query_user_detailinfo* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_USER_DETAILINFO_DB_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_user_detail_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+
+/*
  * 查询数据库表user_detailinfo_db的接口，即用户调用的入口。
  * param:mac,即mac地址，过滤条件
  * param:query_info,类型为结构体query_user_detailinfo，输出对应的结果集 
  * return:FAILURE -1,0 means SUCCESS
  */
-int db_get_user_detail_info_by_mac(char* mac,query_user_detailinfo* query_info)
+int db_get_user_detail_info_by_mac(const char* mac,query_user_detailinfo* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s where MAC_address like '%s';";
+    char* prepStmt = "select * from %s where MAC_address like '%s' order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
    
@@ -1485,10 +2044,10 @@ int db_get_user_detail_info_by_mac(char* mac,query_user_detailinfo* query_info)
  *param:query_info,类型为结构体query_user_detailinfo，输出对应的结果集 
  *return:FAILURE -1,0 means SUCCESS
  */
-int db_get_user_detail_info_by_mac_alias(char* mac_alias,query_user_detailinfo* query_info)
+int db_get_user_detail_info_by_mac_alias(const char* mac_alias,query_user_detailinfo* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s where MAC_alias like '%s';";
+    char* prepStmt = "select * from %s where MAC_alias like '%s' order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1515,10 +2074,10 @@ int db_get_user_detail_info_by_mac_alias(char* mac_alias,query_user_detailinfo* 
  *param:query_info,类型为结构体query_user_detailinfo，输出对应的结果集 
  *return:FAILURE -1,0 means SUCCESS
  */
-int db_get_user_detail_info_by_access_point(char* access_point,query_user_detailinfo* query_info)
+int db_get_user_detail_info_by_access_point(const char* access_point,query_user_detailinfo* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s where access_point like '%s';";
+    char* prepStmt = "select * from %s where access_point like '%s' order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1547,7 +2106,7 @@ int db_get_user_detail_info_by_access_point(char* access_point,query_user_detail
 int db_get_user_index_info(query_user_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1564,6 +2123,96 @@ int db_get_user_index_info(query_user_info* query_info)
     return FAILURE;
 }
 
+/*
+ * 查询数据库表user_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_user_index_info_within_24h(const char* timestamp,query_user_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_USER_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_USER_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_user_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表user_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_user_index_info_within_30d(const char* timestamp,query_user_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_USER_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_USER_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_user_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
 
 /*
  * 查询数据库表wifi_index_info的接口，即用户调用的入口。
@@ -1573,7 +2222,7 @@ int db_get_user_index_info(query_user_info* query_info)
 int db_get_wifi_index_info(query_wifi_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1591,6 +2240,97 @@ int db_get_wifi_index_info(query_wifi_info* query_info)
 }
 
 /*
+ * 查询数据库表wifi_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_wifi_index_info_within_24h(const char* timestamp,query_wifi_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_WIFI_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_WIFI_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_wifi_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表wifi_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_wifi_index_info_within_30d(const char* timestamp,query_wifi_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_WIFI_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_WIFI_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_wifi_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+
+/*
  * 查询数据库表wireless_index_info的接口，即用户调用的入口。
  *param:query_info,类型为结构体query_wireless_info，输出对应的结果集 
  *return:FAILURE -1,0 means SUCCESS
@@ -1598,7 +2338,7 @@ int db_get_wifi_index_info(query_wifi_info* query_info)
 int db_get_wireless_index_info(query_wireless_info* query_info)
 {
     MYSQL mysql;
-    char* prepStmt = "select * from %s;";
+    char* prepStmt = "select * from %s order by collect_timestamp;";
     char queryStmt[256] = {0};
     int ret = 0;
     
@@ -1614,6 +2354,97 @@ int db_get_wireless_index_info(query_wireless_info* query_info)
     }
     return FAILURE;
 }
+
+/*
+ * 查询数据库表wireless_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出２４小时内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_wireless_index_info_within_24h(const char* timestamp,query_wireless_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //24小时内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算24之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_24h(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_WIRELESS_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_WIRELESS_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_wireless_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
+/*
+ * 查询数据库表wireless_index_info,在输入的特定时间段内的历史数据
+ * 如果时间戳为NULL或者空字符串，则默认输出30天内的历史数据
+ * param:timestamp,时间戳,默认为NULL.格式为yyyy-mm-dd hh:mm:ss
+ * param:query_info,返回的结果集存储结构体，为结果的输出
+ * return:FAILURE -1,0 means SUCCESS
+ */
+int db_get_wireless_index_info_within_30d(const char* timestamp,query_wireless_info* query_info)
+{
+    MYSQL mysql;
+    char* prepStmt = "select * from %s where collect_timestamp > '%s' and collect_timestamp <= '%s' order by collect_timestamp;";
+    char queryStmt[256] = {0};
+    int ret = 0;
+    db_get_database_connection(&mysql,SOFTAC_DATABASE_HOST,SOFTAC_DATABASE_USER,SOFTAC_DATABASE_PASSWD,SOFTAC_DATABASE_NAME);
+    if(NULL == timestamp )//|| timestamp == "")
+    {
+        //30天内的数据
+        time_t timep;
+        struct tm* p;
+        time(&timep);
+        p = localtime(&timep);
+        char now_time[20];//当前格式化的时间
+        char return_time[20];//计算30天之前的时刻
+        get_db_format_time_str_from_tm(p,now_time);
+        get_time_within_30d(now_time,return_time);
+        printf("format_time %s\n",now_time);
+        sprintf(queryStmt,prepStmt,SOFTAC_WIRELESS_INDEX_INFO_TABLE,return_time,now_time);
+
+    }
+    else
+    {
+        //否则返回特定时刻之后的数据
+        char* tmStmt = "select * from %s where collect_timestamp > '%s' order by collect_timestamp;";
+        sprintf(queryStmt,tmStmt,SOFTAC_WIRELESS_INDEX_INFO_TABLE,timestamp);
+    }
+    ret = db_do_query_2(&mysql,queryStmt,call_back_get_wireless_index_info,query_info);
+    db_put_database_connection(&mysql);
+    if(ret > 0)
+    {
+        return SUCCESS;
+    }
+
+    return FAILURE;
+}
+
 
 /*
  * query every table'info ,eg. select * from tablename;
@@ -1934,7 +2765,7 @@ int db_add_wireless_index_info(wireless_info* wireless)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_ap_index_info_before_time(char* timestamp)
+int db_delete_ap_index_info_before_time(const char* timestamp)
 {
     
     MYSQL mysql;
@@ -1959,7 +2790,7 @@ int db_delete_ap_index_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_ap_index_info_after_time(char* timestamp)
+int db_delete_ap_index_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -1983,7 +2814,7 @@ int db_delete_ap_index_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_sys_score_info_before_time(char* timestamp)
+int db_delete_sys_score_info_before_time(const char* timestamp)
 {
     
     MYSQL mysql;
@@ -2008,7 +2839,7 @@ int db_delete_sys_score_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_sys_score_info_after_time(char* timestamp)
+int db_delete_sys_score_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2033,7 +2864,7 @@ int db_delete_sys_score_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_throughout_index_info_before_time(char* timestamp)
+int db_delete_throughout_index_info_before_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp < '%s';";
@@ -2057,7 +2888,7 @@ int db_delete_throughout_index_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_throughout_index_info_after_time(char* timestamp)
+int db_delete_throughout_index_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2081,7 +2912,7 @@ int db_delete_throughout_index_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_user_index_info_before_time(char* timestamp)
+int db_delete_user_index_info_before_time(const char* timestamp)
 {
     
     MYSQL mysql;
@@ -2106,7 +2937,7 @@ int db_delete_user_index_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_user_index_info_after_time(char* timestamp)
+int db_delete_user_index_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2131,7 +2962,7 @@ int db_delete_user_index_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_wifi_index_info_before_time(char* timestamp)
+int db_delete_wifi_index_info_before_time(const char* timestamp)
 {
     
     MYSQL mysql;
@@ -2156,7 +2987,7 @@ int db_delete_wifi_index_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_wifi_index_info_after_time(char* timestamp)
+int db_delete_wifi_index_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2181,7 +3012,7 @@ int db_delete_wifi_index_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_wireless_index_info_before_time(char* timestamp)
+int db_delete_wireless_index_info_before_time(const char* timestamp)
 {
     
     MYSQL mysql;
@@ -2206,7 +3037,7 @@ int db_delete_wireless_index_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_wireless_index_info_after_time(char* timestamp)
+int db_delete_wireless_index_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2231,7 +3062,7 @@ int db_delete_wireless_index_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_afi_info_before_time(char* timestamp)
+int db_delete_afi_info_before_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp < '%s';";
@@ -2256,7 +3087,7 @@ int db_delete_afi_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_afi_info_after_time(char* timestamp)
+int db_delete_afi_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2281,7 +3112,7 @@ int db_delete_afi_info_after_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_user_detail_info_before_time(char* timestamp)
+int db_delete_user_detail_info_before_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp < '%s';";
@@ -2306,7 +3137,7 @@ int db_delete_user_detail_info_before_time(char* timestamp)
  *param:timestamp格式化的时间字符串，输入参数，也是过滤条件
  *return:0 means success,-1 means failure
  */
-int db_delete_user_detail_info_after_time(char* timestamp)
+int db_delete_user_detail_info_after_time(const char* timestamp)
 {
     MYSQL mysql;
     char* prepStmt = "delete from %s where collect_timestamp > '%s';";
@@ -2340,14 +3171,21 @@ int main()
     time(&timep);
     p = localtime(&timep);
     char format_time[20];
-   // get_db_format_time_from_tm(p,format_time);
+    //just for special mday.eg.1
+   // struct tm tmpTime;
+    get_time_within_30d("2015-3-30 00:00:00",format_time);
+    //get_db_format_time_str_from_tm(&tmpTime,format_time);
+    printf("Format Time is %s\n",format_time);
+
     get_db_format_time_str_from_tm(p,format_time);
     printf("Format Time is %s\n",format_time);
-    struct tm tmpTime;
-    get_db_tm_from_format_time("2014-12-24 12:00:00",&tmpTime);
-    printf("from format_time_str to tm_month is %d\n",tmpTime.tm_mon);
+    //p->tm_mday = p->tm_mday - 1;
+    //get_db_format_time_str_from_tm(p,format_time);
+   // printf("Format Time is %s\n",format_time);
     /*********************************************/
     /************ap_index_info********************/
+#ifdef DEBUG_TABLE_AP_INDEX_ENABLE
+#if DEBUG_TABLE_AP_INDEX_ENABLE
     ap_info ap;
     ap.signal_intensity = 200;
     ap.down_up_BW = 1024;
@@ -2357,11 +3195,14 @@ int main()
     memset(&queryApInfo,0,sizeof(queryApInfo));
     db_add_ap_index_info(&ap);
     db_delete_ap_index_info_before_time(format_time);
-    db_get_ap_index_info(&queryApInfo);
-
-   // printf("rows:%d\n",queryApInfo.num_rows);
+    db_get_ap_index_info_within_30d("",&queryApInfo);
+    printf("rows:%d\n",queryApInfo.num_rows);
+#endif
+#endif
     /*********************************************/
     /************afi_info*************************/
+#ifdef DEBUG_TABLE_AFI_DETAIL_INFO_ENABLE
+#if DEBUG_TABLE_AFI_DETAIL_INFO_ENABLE
     afi_info afi;
     strcpy(afi.mac_address,"1e:bc:ed:55:9a:10");
     strcpy(afi.afi_name,"mina_afi");
@@ -2379,11 +3220,15 @@ int main()
     memset(&queryAfiInfo,0,sizeof(queryAfiInfo));
 
     db_add_afi_info(&afi); 
-    db_delete_afi_info_before_time(format_time);
-    db_get_afi_info_by_AFi_name("mina",&queryAfiInfo);
+   // db_delete_afi_info_before_time(format_time);
+    db_get_afi_info_within_24h("",&queryAfiInfo);
     printf("rows:%d\n",queryAfiInfo.num_rows);
+#endif
+#endif
     /********************************************/
     /***********sys_health_score*****************/
+#ifdef DEBUG_TABLE_SYS_HEALTH_SCORE_ENABLE
+#if DEBUG_TABLE_SYS_HEALTH_SCORE_ENABLE
     sys_score sys;
     sys.health_score = 99;
     sys.signal_interference = -23;
@@ -2397,11 +3242,15 @@ int main()
     query_sys_info querySysInfo;
     memset(&querySysInfo,0,sizeof(querySysInfo));
     db_add_sys_score_index_info(&sys); 
-    db_delete_sys_score_info_before_time(format_time);
-    db_get_sys_score_info(&querySysInfo);
+   // db_delete_sys_score_info_before_time(format_time);
+    db_get_sys_score_info_within_24h("",&querySysInfo);
     printf("rows:%d\n",querySysInfo.num_rows);
+#endif
+#endif
     /*******************************************/
     /***********throughout_index_info***********/
+#ifdef DEBUG_TABLE_THROUGHOUT_INDEX_ENABLE
+#if DEBUG_TABLE_THROUGHOUT_INDEX_ENABLE
     throughout_info throughout;
     throughout.uplink_packet_num = 567;
     throughout.downlink_packet_num = 567;
@@ -2412,12 +3261,15 @@ int main()
     memset(&queryThroughoutInfo,0,sizeof(queryThroughoutInfo));
 
     db_add_throughout_index_info(&throughout);
-    db_delete_throughout_index_info_before_time(format_time);
-    db_get_throughout_info(&queryThroughoutInfo);
+    //db_delete_throughout_index_info_before_time(format_time);
+    db_get_throughout_info_within_24h("",&queryThroughoutInfo);
     printf("rows:%d\n",queryThroughoutInfo.num_rows);
+#endif
+#endif   
     /*******************************************/
-   
     /***********user_detailinfo_db**************/
+#ifdef DEBUG_TABLE_USER_DETAIL_INFO_ENABLE
+#if DEBUG_TABLE_USER_DETAIL_INFO_ENABLE
     user_detailinfo user;
     strcpy(user.mac_address,"11:3e:fe:4e:12:45");
     strcpy(user.mac_alias,"himgod");
@@ -2437,11 +3289,15 @@ int main()
     memset(&queryUserDetailInfo,0,sizeof(queryUserDetailInfo));
 
     db_add_user_detail_info(&user);
-    db_delete_user_detail_info_before_time(format_time);
-    db_get_user_detail_info(&queryUserDetailInfo);
+   // db_delete_user_detail_info_before_time(format_time);
+    db_get_user_detail_info_within_24h("",&queryUserDetailInfo);
     printf("rows:%d\n",queryUserDetailInfo.num_rows);
+#endif
+#endif     
     /*******************************************/
     /***********user_index_info*****************/
+#ifdef DEBUG_TABLE_USER_INDEX_ENABLE
+#if DEBUG_TABLE_USER_INDEX_ENABLE 
     user_info userinfo;
     userinfo.signal_intensity = -98;
     userinfo.consultation_rate = 1024;
@@ -2452,11 +3308,15 @@ int main()
     memset(&queryUserInfo,0,sizeof(queryUserInfo));
 
     db_add_user_index_info(&userinfo);
-    db_delete_user_index_info_before_time(format_time);
-    db_get_user_index_info(&queryUserInfo);
+   // db_delete_user_index_info_before_time(format_time);
+    db_get_user_index_info_within_24h("",&queryUserInfo);
     printf("rows:%d\n",queryUserInfo.num_rows);
+#endif
+#endif 
     /*******************************************/
     /***********wireless_index_info*************/
+#ifdef DEBUG_TABLE_WIFI_INDEX_ENABLE
+#if DEBUG_TABLE_WIFI_INDEX_ENABLE
     wifi_info wifiinfo;
     wifiinfo.signal_noise_rate = 121;
     wifiinfo.channel_utilization = 100;
@@ -2466,11 +3326,15 @@ int main()
     memset(&queryWifiInfo,0,sizeof(queryWifiInfo));
     
     db_add_wifi_index_info(&wifiinfo);
-    db_delete_wifi_index_info_before_time(format_time);
-    db_get_wifi_index_info(&queryWifiInfo);
+ //   db_delete_wifi_index_info_before_time(format_time);
+    db_get_wifi_index_info_within_24h("",&queryWifiInfo);
     printf("rows:%d\n",queryWifiInfo.num_rows);
+#endif
+#endif 
     /*******************************************/
     /***********wifi_index_info*****************/
+#ifdef DEBUG_TABLE_WIRELESS_INDEX_ENABLE
+#if DEBUG_TABLE_WIRELESS_INDEX_ENABLE
     wireless_info wire;
     strcpy(wire.essid,"test");
     strcpy(wire.AFi_n,"1011");
@@ -2484,10 +3348,11 @@ int main()
     query_wireless_info queryWirelessInfo;
     memset(&queryWirelessInfo,0,sizeof(queryWirelessInfo));
     db_add_wireless_index_info(&wire);
-    db_delete_wireless_index_info_before_time(format_time);
-    db_get_wireless_index_info(&queryWirelessInfo);
+   // db_delete_wireless_index_info_before_time(format_time);
+    db_get_wireless_index_info_within_24h("",&queryWirelessInfo);
     printf("rows:%d\n",queryWirelessInfo.num_rows);
-    
+#endif
+#endif     
     return 0;
 }
 

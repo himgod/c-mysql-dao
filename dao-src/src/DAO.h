@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <mysql.h>
+#include "/usr/include/mysql/mysql.h"
 #include <stdlib.h>
 
 #define SOFTAC_DATABASE_HOST "localhost"
@@ -41,7 +41,17 @@
 #define FORMAT_TIME_STR "%Y-%m-%d %H:%M:%S"
 
 #define TEST_MAIN 1
+#define DEBUG_TABLE_AP_INDEX_ENABLE 0
+#define DEBUG_TABLE_SYS_HEALTH_SCORE_ENABLE 0
+#define DEBUG_TABLE_AFI_DETAIL_INFO_ENABLE 0
+#define DEBUG_TABLE_THROUGHOUT_INDEX_ENABLE 0
+#define DEBUG_TABLE_USER_DETAIL_INFO_ENABLE 0
+#define DEBUG_TABLE_USER_INDEX_ENABLE 0
+#define DEBUG_TABLE_WIFI_INDEX_ENABLE 0
+#define DEBUG_TABLE_WIRELESS_INDEX_ENABLE 1
 
+
+int month[] = {31,28,31,30,31,30,31,31,30,31,30,31};
 /**
  *this is for struct body
  *每一张表格对应表示字段的构成的结构体和
@@ -203,12 +213,16 @@ typedef struct query_wireless_info{
     wireless_info* wirelessInfo;
 }query_wireless_info;
 
+
 /*
  *格式化时间转换函数
  */
 int get_db_format_time_str_from_tm(struct tm* timeinfo,char* format_time);
-int get_db_tm_from_format_time(char* format_time,struct tm* timeinfo);
-
+int get_db_tm_from_format_time(const char* format_time,struct tm* timeinfo);
+//获取24小时之前的时间戳
+char* get_time_within_24h(const char* timestamp,char* format_time);
+//获取30天之前的时间戳
+char* get_time_within_30d(const char* timestamp,char* format_time);
 /*
  *数据库接口，包含了添加，删除，插入等操作
  */
@@ -229,21 +243,31 @@ int db_get_wireless_index_info(query_wireless_info* query_info);
 
 //TODO
 //根据时间段查询
-int db_get_ap_index_info_after_timestamp(char* timestamp,query_ap_info* query_info);
-int db_get_afi_info_after_timestamp(char* timestamp,query_afi_info* query_info);
-int db_get_sys_score_info_after_timestamp(char* timestamp,query_sys_info* query_info);
-int db_get_throughout_index_info_after_timestamp(char* timestamp,query_throughout_info* query_info);
-int db_get_user_detail_info_after_timestamp(char* timestamp,query_user_detailinfo* query_info);
-int db_get_user_index_info_after_timestamp(char* timestamp,query_user_info* query_info);
-int db_get_wifi_index_info_after_timestamp(char* timestamp,query_wifi_info* query_info);
-int db_get_wireless_index_info_after_timestamp(char* timestamp,query_wireless_info* query_info);
-
+//获取24小时内的数据，默认从调用函数那一刻算起，倒推24小时
+//int test(int a,int b = 0);
+int db_get_ap_index_info_within_24h(const char* timestamp,query_ap_info* query_info);
+int db_get_afi_info_within_24h(const char* timestamp,query_afi_info* query_info);
+int db_get_sys_score_info_within_24h(const char* timestamp,query_sys_info* query_info);
+int db_get_throughout_index_info_within_24h(const char* timestamp,query_throughout_info* query_info);
+int db_get_user_detail_info_within_24h(const char* timestamp,query_user_detailinfo* query_info);
+int db_get_user_index_info_within_24h(const char* timestamp,query_user_info* query_info);
+int db_get_wifi_index_info_within_24h(const char* timestamp,query_wifi_info* query_info);
+int db_get_wireless_index_info_within_24h(const char* timestamp,query_wireless_info* query_info);
+//获取30天内的数据，默认从调用函数那一天算起，倒推30天
+int db_get_ap_index_info_within_30d(const char* timestamp,query_ap_info* query_info);
+int db_get_afi_info_within_30d(const char* timestamp,query_afi_info* query_info);
+int db_get_sys_score_info_within_30d(const char* timestamp,query_sys_info* query_info);
+int db_get_throughout_index_info_within_30d(const char* timestamp,query_throughout_info* query_info);
+int db_get_user_detail_info_within_30d(const char* timestamp,query_user_detailinfo* query_info);
+int db_get_user_index_info_within_30d(const char* timestamp,query_user_info* query_info);
+int db_get_wifi_index_info_within_30d(const char* timestamp,query_wifi_info* query_info);
+int db_get_wireless_index_info_within_30d(const char* timestamp,query_wireless_info* query_info);
 //根据不同字段
-int db_get_afi_info_by_mac(char* mac,query_afi_info* query_info);
-int db_get_afi_info_by_AFi_name(char* AFi_name,query_afi_info* query_info);
-int db_get_user_detail_info_by_mac(char* mac,query_user_detailinfo* query_info);
-int db_get_user_detail_info_by_mac_alias(char* mac_alias,query_user_detailinfo* query_info);
-int db_get_user_detail_info_by_access_point(char* access_point,query_user_detailinfo* query_info);
+int db_get_afi_info_by_mac(const char* mac,query_afi_info* query_info);
+int db_get_afi_info_by_AFi_name(const char* AFi_name,query_afi_info* query_info);
+int db_get_user_detail_info_by_mac(const char* mac,query_user_detailinfo* query_info);
+int db_get_user_detail_info_by_mac_alias(const char* mac_alias,query_user_detailinfo* query_info);
+int db_get_user_detail_info_by_access_point(const char* access_point,query_user_detailinfo* query_info);
 /*
  *添加数据库接口
  */
@@ -259,22 +283,22 @@ int db_add_wireless_index_info(wireless_info* wireless);
 /*
  *删除数据库记录接口
  */
-int db_delete_ap_index_info_before_time(char* timestamp);
-int db_delete_ap_index_info_after_time(char* timestamp);
-int db_delete_afi_info_before_time(char* timestamp);
-int db_delete_afi_info_after_time(char* timestamp);
-int db_delete_sys_score_info_before_time(char* timestamp);
-int db_delete_sys_score_info_after_time(char* timestamp);
-int db_delete_throughout_index_info_before_time(char* timestamp);
-int db_delete_throughout_index_info_after_time(char* timestamp);
-int db_delete_user_detail_info_before_time(char* timestamp);
-int db_delete_user_detail_info_after_time(char* timestamp);
-int db_delete_user_index_info_before_time(char* timestamp);
-int db_delete_user_index_info_after_time(char* timestamp);
-int db_delete_wifi_index_info_before_time(char* timestamp);
-int db_delete_wifi_index_info_after_time(char* timestamp);
-int db_delete_wireless_index_info_before_time(char* timestamp);
-int db_delete_wireless_index_info_after_time(char* timestamp);
+int db_delete_ap_index_info_before_time(const char* timestamp);
+int db_delete_ap_index_info_after_time(const char* timestamp);
+int db_delete_afi_info_before_time(const char* timestamp);
+int db_delete_afi_info_after_time(const char* timestamp);
+int db_delete_sys_score_info_before_time(const char* timestamp);
+int db_delete_sys_score_info_after_time(const char* timestamp);
+int db_delete_throughout_index_info_before_time(const char* timestamp);
+int db_delete_throughout_index_info_after_time(const char* timestamp);
+int db_delete_user_detail_info_before_time(const char* timestamp);
+int db_delete_user_detail_info_after_time(const char* timestamp);
+int db_delete_user_index_info_before_time(const char* timestamp);
+int db_delete_user_index_info_after_time(const char* timestamp);
+int db_delete_wifi_index_info_before_time(const char* timestamp);
+int db_delete_wifi_index_info_after_time(const char* timestamp);
+int db_delete_wireless_index_info_before_time(const char* timestamp);
+int db_delete_wireless_index_info_after_time(const char* timestamp);
 /*
  *数据库更新操作接口
  */
